@@ -1,6 +1,4 @@
-# pyrefly: ignore [missing-import]
 import torch 
-# pyrefly: ignore [missing-import]
 from transformers import GPT2LMHeadModel, GPT2Tokenizer  
 
 device = "cuda" 

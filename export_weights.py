@@ -1,6 +1,6 @@
-import os # pyrefly: ignore [missing-import]
-import numpy as np # pyrefly: ignore [missing-import]
-from transformers import GPT2LMHeadModel # pyrefly: ignore [missing-import] 
+import os
+import numpy as np 
+from transformers import GPT2LMHeadModel 
 
 model = GPT2LMHeadModel.from_pretrained("gpt2") 
 
