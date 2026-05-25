@@ -15,6 +15,7 @@ add_executable(
     src/tensor.cpp
 
     kernels/embedding.cu
+    kernels/linear.cu
 )
 
 target_link_libraries(
