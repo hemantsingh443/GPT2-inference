@@ -13,4 +13,6 @@ struct Tensor {
     std::vector<int> shape; 
     size_t numel;  
     Device device;
-};
+}; 
+
+Tensor create_gpu_tensor(std::vector<int> shape);

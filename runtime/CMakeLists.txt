@@ -24,8 +24,24 @@ target_link_libraries(
     cudart
 )
 
+add_executable(
+    test_runner
+
+    tests/test_runner.cu
+    src/tensor.cpp
+
+    kernels/embedding.cu
+    kernels/linear.cu
+    kernels/layernorm.cu
+)
+
+target_link_libraries(
+    test_runner
+    cudart
+)
+
 set_target_properties(
-    gpt_runtime
+    gpt_runtime test_runner
     PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
 )
@@ -33,7 +49,7 @@ set_target_properties(
 # Optional
 
 set_target_properties(
-    gpt_runtime
+    gpt_runtime test_runner
     PROPERTIES
     CUDA_ARCHITECTURES native
 )
