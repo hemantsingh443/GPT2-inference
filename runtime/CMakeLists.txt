@@ -12,14 +12,16 @@ add_executable(
     gpt_runtime
 
     src/main.cpp
-    src/tensor.cpp
+    src/tensor.cpp 
+    src/gpt2.cpp
 
     kernels/embedding.cu
     kernels/linear.cu
     kernels/layernorm.cu  
     kernels/attention.cu
     kernels/residual.cu 
-    kernels/gelu.cu
+    kernels/gelu.cu 
+    
 
 )
 
@@ -32,7 +34,8 @@ add_executable(
     test_runner
 
     tests/test_runner.cu
-    src/tensor.cpp
+    src/tensor.cpp 
+    src/gpt2.cpp
 
     kernels/embedding.cu
     kernels/linear.cu

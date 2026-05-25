@@ -5,7 +5,7 @@
 #include "tensor.h" 
 
 //architectural params for gpt2 (124m) 
-struct GPT2config { 
+struct GPT2Config { 
     int vocab_size = 50257; 
     int n_positions = 1024; 
     int n_embd = 768; 
