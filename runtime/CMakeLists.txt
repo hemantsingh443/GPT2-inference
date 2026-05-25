@@ -16,6 +16,7 @@ add_executable(
 
     kernels/embedding.cu
     kernels/linear.cu
+    kernels/layernorm.cu
 )
 
 target_link_libraries(

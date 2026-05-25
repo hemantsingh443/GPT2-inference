@@ -5,7 +5,8 @@
 #include "../include/tensor.h"  
 #include "../include/cuda_utils.h" 
 #include "../include/embedding.h"
-#include "../include/linear.h"
+#include "../include/linear.h" 
+#include "../include/layernorm.h"
 
 Tensor create_gpu_tensor( 
     std::vector<int> shape
@@ -160,5 +161,65 @@ int main() {
         std::cout << "\nGEMM Output first 10 values:\n";
         for (int i = 0; i < 10; ++i) {
             std::cout << "[" << i << "]: " << verify_fc[i] << "\n";
+        } 
+
+        //test for layernorm 
+
+        //laod layernorm weights and bias 
+        std::vector<float> host_ln_weight = load_binary_file(
+            "../../weights/transformer_h_0_ln_1_weight.bin"
+        );
+        std::vector<float> host_ln_bias = load_binary_file(
+            "../../weights/transformer_h_0_ln_1_bias.bin"
+        );  
+
+        //allocate gpu tensors 
+        Tensor ln_weight = create_gpu_tensor({768});
+        Tensor ln_bias = create_gpu_tensor({768});  
+        Tensor ln_output = create_gpu_tensor({768}); 
+
+        //copy weight and bias to GPU
+        CUDA_CHECK(
+            cudaMemcpy(
+                ln_weight.data,
+                host_ln_weight.data(),
+                ln_weight.numel * sizeof(float),
+                cudaMemcpyHostToDevice
+            )
+        );
+        CUDA_CHECK(
+            cudaMemcpy(
+                ln_bias.data,
+                host_ln_bias.data(),
+                ln_bias.numel * sizeof(float),
+                cudaMemcpyHostToDevice
+            )
+        );  
+
+        //run layernorm 
+        layernorm_forward( 
+            output.data, 
+            ln_weight.data, 
+            ln_bias.data, 
+            ln_output.data, 
+            768, 
+            1e-5
+        );  
+
+         //Copy back to host and verify the first 10 values
+        std::vector<float> verify_ln(10);
+        CUDA_CHECK(
+            cudaMemcpy(
+                verify_ln.data(),
+                ln_output.data,
+                10 * sizeof(float),
+                cudaMemcpyDeviceToHost
+            )
+        );
+        
+        std::cout << "\nLayerNorm Output first 10 values:\n";
+        for (int i = 0; i < 10; ++i) {
+            std::cout << "[" << i << "]: " << verify_ln[i] << "\n";
         }
+        
 }
