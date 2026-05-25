@@ -7,29 +7,6 @@
 #include "../include/residual.h"
 #include "../include/gelu.h"
 
-// CUDA kernel to perform embedding lookup and sum token + position embeddings
-__global__
-void embedding_lookup_and_sum_kernel(
-    const int* token_ids,
-    float* wte,
-    float* wpe,
-    float* output,
-    int seq_len,
-    int n_embd
-) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int total_elements = seq_len * n_embd;
-    if (idx < total_elements) {
-        int pos = idx / n_embd;
-        int emb_dim = idx % n_embd;
-        int token_id = token_ids[pos];
-        
-        float token_val = wte[token_id * n_embd + emb_dim];
-        float pos_val = wpe[pos * n_embd + emb_dim];
-        output[idx] = token_val + pos_val;
-    }
-}
-
 float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) {
     // Note: Assumes batch_size = 1 for simplicity in this implementation
     int n_embd = config.n_embd;
@@ -39,20 +16,40 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
     CUDA_CHECK(cudaMalloc(&d_tokens, seq_len * sizeof(int)));
     CUDA_CHECK(cudaMemcpy(d_tokens, input_tokens, seq_len * sizeof(int), cudaMemcpyHostToDevice));
     
-    // Compute token + position embeddings: lookup & sum
-    int total_elements = seq_len * n_embd;
-    int threads_per_block = 256;
-    int blocks = (total_elements + threads_per_block - 1) / threads_per_block;
-    
-    embedding_lookup_and_sum_kernel<<<blocks, threads_per_block>>>(
-        d_tokens,
+    // Token embeddings lookup -> activations.x
+    embedding_lookup(
         weights.wte.data,
-        weights.wpe.data,
+        d_tokens,
         activations.x.data,
         seq_len,
         n_embd
     );
-    CUDA_CHECK(cudaDeviceSynchronize());
+
+    // Position embeddings lookup -> activations.residual
+    std::vector<int> pos_ids(seq_len);
+    for (int i = 0; i < seq_len; ++i) {
+        pos_ids[i] = i;
+    }
+    int* d_pos_ids;
+    CUDA_CHECK(cudaMalloc(&d_pos_ids, seq_len * sizeof(int)));
+    CUDA_CHECK(cudaMemcpy(d_pos_ids, pos_ids.data(), seq_len * sizeof(int), cudaMemcpyHostToDevice));
+
+    embedding_lookup(
+        weights.wpe.data,
+        d_pos_ids,
+        activations.residual.data,
+        seq_len,
+        n_embd
+    );
+    
+    CUDA_CHECK(cudaFree(d_pos_ids));
+
+    // Sum WTE + WPE -> activations.x
+    residual_add(
+        activations.x.data,
+        activations.residual.data,
+        seq_len * n_embd
+    );
     
     // Free the temporary token ID GPU memory
     cudaFree(d_tokens);

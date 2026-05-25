@@ -14,6 +14,7 @@ add_executable(
     src/main.cpp
     src/tensor.cpp 
     src/gpt2.cpp
+    src/tokenizer.cpp
 
     kernels/embedding.cu
     kernels/linear.cu
@@ -22,9 +23,6 @@ add_executable(
     kernels/residual.cu 
     kernels/gelu.cu 
     kernels/gpt2_forward.cu
- 
-    
-
 )
 
 target_link_libraries(
@@ -38,6 +36,7 @@ add_executable(
     tests/test_runner.cu
     src/tensor.cpp 
     src/gpt2.cpp
+    src/tokenizer.cpp
 
     kernels/embedding.cu
     kernels/linear.cu

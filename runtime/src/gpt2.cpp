@@ -70,7 +70,7 @@ void GPT2Model::allocate_weights() {
         block.ln_2_bias = create_gpu_tensor({config.n_embd});
         block.c_fc_weight = create_gpu_tensor({config.n_embd, 4 * config.n_embd});
         block.c_fc_bias = create_gpu_tensor({4 * config.n_embd});
-        block.c_proj_weight_mlp = create_gpu_tensor({config.n_embd, config.n_embd});
+        block.c_proj_weight_mlp = create_gpu_tensor({4 * config.n_embd, config.n_embd});
         block.c_proj_bias_mlp = create_gpu_tensor({config.n_embd});
     }
     

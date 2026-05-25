@@ -10,6 +10,8 @@
 #include "../include/layernorm.h"
 #include "../include/attention.h"  
 #include "../include/residual.h"
+#include "../include/gpt2.h"
+#include "../include/tokenizer.h"
 
 // Forward declaration of create_gpu_tensor (since it's defined in tensor.cpp)
 Tensor create_gpu_tensor( 
@@ -233,6 +235,26 @@ int main() {
     
     std::cout << "Test 5: Full Model Forward Pass -> " << (model_passed ? "PASSED" : "FAILED") << "\n";
 
+    // 6. Test Tokenizer
+    std::cout << "\nTesting Tokenizer...\n";
+    Tokenizer tokenizer;
+    tokenizer.load("../../weights/vocab.bin", "../../weights/merges.bin");
+    
+    std::string test_str = "GPT2 inference runtime in C++ and CUDA";
+    std::vector<int> encoded = tokenizer.encode(test_str);
+    std::vector<int> expected_ids = {38, 11571, 17, 32278, 19124, 287, 327, 4880, 290, 29369, 5631};
+    
+    bool tok_passed = (encoded == expected_ids);
+    std::cout << "Encoded token IDs: ";
+    for (int id : encoded) std::cout << id << " ";
+    std::cout << "\n";
+    
+    std::string decoded = tokenizer.decode(encoded);
+    std::cout << "Decoded string: \"" << decoded << "\"\n";
+    if (decoded != test_str) tok_passed = false;
+    
+    std::cout << "Test 6: Tokenizer -> " << (tok_passed ? "PASSED" : "FAILED") << "\n\n";
+
     // Clean up
     cudaFree(d_token);
     cudaFree(wte.data);
@@ -252,7 +274,7 @@ int main() {
     cudaFree(proj_b.data); 
     cudaFree(final_attn_out.data); 
 
-    if (emb_passed && fc_passed && ln_passed && attn_passed && model_passed) {
+    if (emb_passed && fc_passed && ln_passed && attn_passed && model_passed && tok_passed) {
         std::cout << "All tests PASSED!\n";
         return 0;
     } else {
