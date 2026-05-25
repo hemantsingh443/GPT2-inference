@@ -21,6 +21,8 @@ add_executable(
     kernels/attention.cu
     kernels/residual.cu 
     kernels/gelu.cu 
+    kernels/gpt2_forward.cu
+ 
     
 
 )
@@ -43,6 +45,7 @@ add_executable(
     kernels/attention.cu
     kernels/residual.cu 
     kernels/gelu.cu
+    kernels/gpt2_forward.cu
 )
 
 target_link_libraries(

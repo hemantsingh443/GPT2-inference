@@ -58,7 +58,7 @@ int main() {
     CUDA_CHECK(cudaMemcpy(d_token, &token, sizeof(int), cudaMemcpyHostToDevice));
 
     Tensor output = create_gpu_tensor({768});
-    embedding_lookup(wte.data, d_token, output.data, 768);
+    embedding_lookup(wte.data, d_token, output.data, 1, 768);
 
     std::vector<float> verify_emb(768);
     CUDA_CHECK(cudaMemcpy(verify_emb.data(), output.data, 768 * sizeof(float), cudaMemcpyDeviceToHost));
@@ -137,9 +137,7 @@ int main() {
     CUDA_CHECK(cudaMemcpy(d_tokens, tokens.data(), 3 * sizeof(int), cudaMemcpyHostToDevice));
     // Lookup embeddings for 3 tokens
     Tensor seq_output = create_gpu_tensor({3, 768});
-    for (int s = 0; s < 3; ++s) {
-        embedding_lookup(wte.data, d_tokens + s, seq_output.data + s * 768, 768);
-    }
+    embedding_lookup(wte.data, d_tokens, seq_output.data, 3, 768);
     // Load Attention QKV Projection Weights & Biases
     std::vector<float> host_attn_w = load_binary_file("../../weights/transformer_h_0_attn_c_attn_weight.bin");
     std::vector<float> host_attn_b = load_binary_file("../../weights/transformer_h_0_attn_c_attn_bias.bin");
@@ -178,6 +176,63 @@ int main() {
     }
     std::cout << "Test 4: Causal Self-Attention + Projection -> " << (attn_passed ? "PASSED" : "FAILED") << "\n";
 
+
+        // Test Full Model Forward Pass
+    std::cout << "Loading full GPT-2 model weights...\n";
+    GPT2Config cfg;
+    GPT2Model model(cfg);
+    model.load_weights("../../weights");
+    
+    std::cout << "Running full model forward pass...\n";
+    float* d_logits = model.forward(tokens.data(), 1, 3);
+    
+    std::vector<float> verify_logits(3 * cfg.vocab_size);
+    CUDA_CHECK(cudaMemcpy(verify_logits.data(), d_logits, 3 * cfg.vocab_size * sizeof(float), cudaMemcpyDeviceToHost));
+    
+    std::vector<float> ref_logits0 = {-35.236275f, -35.326614f, -38.975384f, -39.390717f, -37.65322f};
+    std::vector<float> ref_logits2 = {-76.941086f, -79.28483f, -80.43526f, -80.43415f, -80.22852f};
+    
+    bool model_passed = true;
+    for (int i = 0; i < 5; ++i) {
+        if (!check_close(verify_logits[0 * cfg.vocab_size + i], ref_logits0[i], 1e-2)) model_passed = false;
+        if (!check_close(verify_logits[2 * cfg.vocab_size + i], ref_logits2[i], 1e-2)) model_passed = false;
+    }
+    
+    // Argmax check for predicted next tokens
+    int pred_token0 = 0;
+    int pred_token1 = 0;
+    int pred_token2 = 0;
+    
+    float max_val0 = -1e20f;
+    float max_val1 = -1e20f;
+    float max_val2 = -1e20f;
+    
+    for (int v = 0; v < cfg.vocab_size; ++v) {
+        if (verify_logits[0 * cfg.vocab_size + v] > max_val0) {
+            max_val0 = verify_logits[0 * cfg.vocab_size + v];
+            pred_token0 = v;
+        }
+        if (verify_logits[1 * cfg.vocab_size + v] > max_val1) {
+            max_val1 = verify_logits[1 * cfg.vocab_size + v];
+            pred_token1 = v;
+        }
+        if (verify_logits[2 * cfg.vocab_size + v] > max_val2) {
+            max_val2 = verify_logits[2 * cfg.vocab_size + v];
+            pred_token2 = v;
+        }
+    }
+    
+    std::cout << "\nPredicted next tokens:\n";
+    std::cout << "Position 0 -> predicted: " << pred_token0 << " (expected: 11)\n";
+    std::cout << "Position 1 -> predicted: " << pred_token1 << " (expected: 464)\n";
+    std::cout << "Position 2 -> predicted: " << pred_token2 << " (expected: 262)\n";
+    
+    if (pred_token0 != 11 || pred_token1 != 464 || pred_token2 != 262) {
+        model_passed = false;
+    }
+    
+    std::cout << "Test 5: Full Model Forward Pass -> " << (model_passed ? "PASSED" : "FAILED") << "\n";
+
     // Clean up
     cudaFree(d_token);
     cudaFree(wte.data);
@@ -197,7 +252,7 @@ int main() {
     cudaFree(proj_b.data); 
     cudaFree(final_attn_out.data); 
 
-    if (emb_passed && fc_passed && ln_passed && attn_passed) {
+    if (emb_passed && fc_passed && ln_passed && attn_passed && model_passed) {
         std::cout << "All tests PASSED!\n";
         return 0;
     } else {
