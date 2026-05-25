@@ -16,7 +16,11 @@ add_executable(
 
     kernels/embedding.cu
     kernels/linear.cu
-    kernels/layernorm.cu
+    kernels/layernorm.cu  
+    kernels/attention.cu
+    kernels/residual.cu 
+    kernels/gelu.cu
+
 )
 
 target_link_libraries(
@@ -32,7 +36,10 @@ add_executable(
 
     kernels/embedding.cu
     kernels/linear.cu
-    kernels/layernorm.cu
+    kernels/layernorm.cu 
+    kernels/attention.cu
+    kernels/residual.cu 
+    kernels/gelu.cu
 )
 
 target_link_libraries(

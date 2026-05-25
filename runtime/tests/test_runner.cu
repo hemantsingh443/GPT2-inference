@@ -8,6 +8,8 @@
 #include "../include/embedding.h"
 #include "../include/linear.h"
 #include "../include/layernorm.h"
+#include "../include/attention.h"  
+#include "../include/residual.h"
 
 // Forward declaration of create_gpu_tensor (since it's defined in tensor.cpp)
 Tensor create_gpu_tensor( 
@@ -125,7 +127,56 @@ int main() {
             ln_passed = false;
         }
     }
-    std::cout << "Test 3: LayerNorm -> " << (ln_passed ? "PASSED" : "FAILED") << "\n\n";
+    std::cout << "Test 3: LayerNorm -> " << (ln_passed ? "PASSED" : "FAILED") << "\n\n"; 
+
+    // Test Attention (attention_forward) + Output Projection
+    // Load sequence [15496, 50256, 1234]
+    std::vector<int> tokens = {15496, 50256, 1234};
+    int* d_tokens;
+    CUDA_CHECK(cudaMalloc(&d_tokens, 3 * sizeof(int)));
+    CUDA_CHECK(cudaMemcpy(d_tokens, tokens.data(), 3 * sizeof(int), cudaMemcpyHostToDevice));
+    // Lookup embeddings for 3 tokens
+    Tensor seq_output = create_gpu_tensor({3, 768});
+    for (int s = 0; s < 3; ++s) {
+        embedding_lookup(wte.data, d_tokens + s, seq_output.data + s * 768, 768);
+    }
+    // Load Attention QKV Projection Weights & Biases
+    std::vector<float> host_attn_w = load_binary_file("../../weights/transformer_h_0_attn_c_attn_weight.bin");
+    std::vector<float> host_attn_b = load_binary_file("../../weights/transformer_h_0_attn_c_attn_bias.bin");
+    Tensor attn_w = create_gpu_tensor({768, 2304});
+    Tensor attn_b = create_gpu_tensor({2304});
+    Tensor attn_qkv = create_gpu_tensor({3, 2304});
+    CUDA_CHECK(cudaMemcpy(attn_w.data, host_attn_w.data(), attn_w.numel * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(attn_b.data, host_attn_b.data(), attn_b.numel * sizeof(float), cudaMemcpyHostToDevice));
+    // Batched linear projection to QKV
+    for (int s = 0; s < 3; ++s) {
+        linear_forward(seq_output.data + s * 768, attn_w.data, attn_b.data, attn_qkv.data + s * 2304, 768, 2304);
+    }
+    // Run Causal Self-Attention
+    Tensor attn_out = create_gpu_tensor({3, 768});
+    attention_forward(attn_qkv.data, attn_out.data, 3, 12, 64);
+    // Project output using c_proj
+    std::vector<float> host_proj_w = load_binary_file("../../weights/transformer_h_0_attn_c_proj_weight.bin");
+    std::vector<float> host_proj_b = load_binary_file("../../weights/transformer_h_0_attn_c_proj_bias.bin");
+    Tensor proj_w = create_gpu_tensor({768, 768});
+    Tensor proj_b = create_gpu_tensor({768});
+    Tensor final_attn_out = create_gpu_tensor({3, 768});
+    CUDA_CHECK(cudaMemcpy(proj_w.data, host_proj_w.data(), proj_w.numel * sizeof(float), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(proj_b.data, host_proj_b.data(), proj_b.numel * sizeof(float), cudaMemcpyHostToDevice));
+    for (int s = 0; s < 3; ++s) {
+        linear_forward(attn_out.data + s * 768, proj_w.data, proj_b.data, final_attn_out.data + s * 768, 768, 768);
+    }
+    // Verify first 5 values for token 0 and token 2
+    std::vector<float> verify_attn(3 * 768);
+    CUDA_CHECK(cudaMemcpy(verify_attn.data(), final_attn_out.data, 3 * 768 * sizeof(float), cudaMemcpyDeviceToHost));
+    std::vector<float> ref_token0 = {0.5459095f, -0.82332975f, 0.39609146f, -0.06768971f, 0.07372971f};
+    std::vector<float> ref_token2 = {0.9198164f, -0.41184098f, 0.63222086f, -0.04071165f, 0.0521681f};
+    bool attn_passed = true;
+    for (int i = 0; i < 5; ++i) {
+        if (!check_close(verify_attn[0 * 768 + i], ref_token0[i], 1e-3)) attn_passed = false;
+        if (!check_close(verify_attn[2 * 768 + i], ref_token2[i], 1e-3)) attn_passed = false;
+    }
+    std::cout << "Test 4: Causal Self-Attention + Projection -> " << (attn_passed ? "PASSED" : "FAILED") << "\n";
 
     // Clean up
     cudaFree(d_token);
@@ -136,9 +187,17 @@ int main() {
     cudaFree(fc_output.data);
     cudaFree(ln_weight.data);
     cudaFree(ln_bias.data);
-    cudaFree(ln_output.data);
+    cudaFree(ln_output.data); 
+    cudaFree(seq_output.data); 
+    cudaFree(attn_w.data); 
+    cudaFree(attn_b.data); 
+    cudaFree(attn_qkv.data); 
+    cudaFree(attn_out.data); 
+    cudaFree(proj_w.data); 
+    cudaFree(proj_b.data); 
+    cudaFree(final_attn_out.data); 
 
-    if (emb_passed && fc_passed && ln_passed) {
+    if (emb_passed && fc_passed && ln_passed && attn_passed) {
         std::cout << "All tests PASSED!\n";
         return 0;
     } else {
