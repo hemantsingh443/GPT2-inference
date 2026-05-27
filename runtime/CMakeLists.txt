@@ -52,8 +52,22 @@ target_link_libraries(
     cudart
 )
 
+add_executable(
+    benchmark_runner
+
+    tests/benchmark_runner.cu
+    src/tensor.cpp
+
+    kernels/linear.cu
+)
+
+target_link_libraries(
+    benchmark_runner
+    cudart
+)
+
 set_target_properties(
-    gpt_runtime test_runner
+    gpt_runtime test_runner benchmark_runner
     PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
 )
@@ -61,7 +75,7 @@ set_target_properties(
 # Optional
 
 set_target_properties(
-    gpt_runtime test_runner
+    gpt_runtime test_runner benchmark_runner
     PROPERTIES
     CUDA_ARCHITECTURES native
 )

@@ -1,0 +1,24 @@
+
+naive approch:
+
+=========================================================================================
+                         Model GEMM/GEMV Performance Benchmark                       
+
+=========================================================================================
+Layer          SeqLen    InFeatures     OutFeatures    Transposed  Latency (ms)   GFLOPS
+Attention Proj 8         768            768            No          0.930324       10.144
+MLP Expansion  8         768            3072           No          1.09068        34.6102
+Vocabulary Proj8         768            50257          Yes         32.7867        18.8356
+Attention QKV  128       768            2304           No          15.5769        29.0806
+Attention Proj 128       768            768            No          15.0023        10.0648
+MLP Expansion  128       768            3072           No          17.8626        33.8126
+Vocabulary Proj128       768            50257          Yes         536.202        18.4276
+Attention QKV  512       768            2304           No          52.9711        34.2062
+Attention Proj 512       768            768            No          47.3475        12.7563
+MLP Expansion  512       768            3072           No          61.1273        39.5228
+Vocabulary Proj512       768            50257          Yes         2107.25        18.756
+Attention QKV  1024      768            2304           No          122.333        29.6231        
+Attention Proj 1024      768            768            No          122.109        9.89248        
+MLP Expansion  1024      768            3072           No          153.852        31.4058        
+Vocabulary Proj1024      768            50257          Yes         4235.52        18.663
+=========================================================================================
