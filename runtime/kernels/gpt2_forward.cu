@@ -80,16 +80,15 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
         }
         
         // Projection to QKV: ln_out @ c_attn -> qkv
-        for (int s = 0; s < seq_len; ++s) {
-            linear_forward(
-                activations.ln_out.data + s * n_embd,
-                block.c_attn_weight.data,
-                block.c_attn_bias.data,
-                activations.qkv.data + s * 3 * n_embd,
-                n_embd,
-                3 * n_embd
-            );
-        }
+        linear_forward(
+            activations.ln_out.data,
+            block.c_attn_weight.data,
+            block.c_attn_bias.data,
+            activations.qkv.data,
+            n_embd,
+            3 * n_embd,
+            seq_len
+        );
         
         // Self-Attention calculation: qkv -> attn_out
         attention_forward(
@@ -101,16 +100,15 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
         );
         
         // Attention Output Projection: attn_out @ c_proj -> x
-        for (int s = 0; s < seq_len; ++s) {
-            linear_forward(
-                activations.attn_out.data + s * n_embd,
-                block.c_proj_weight.data,
-                block.c_proj_bias.data,
-                activations.x.data + s * n_embd,
-                n_embd,
-                n_embd
-            );
-        }
+        linear_forward(
+            activations.attn_out.data,
+            block.c_proj_weight.data,
+            block.c_proj_bias.data,
+            activations.x.data,
+            n_embd,
+            n_embd,
+            seq_len
+        );
         
         // Add residual: x += residual
         residual_add(
@@ -141,16 +139,15 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
         }
         
         // MLP First Projection: ln_out @ c_fc -> mlp_hidden
-        for (int s = 0; s < seq_len; ++s) {
-            linear_forward(
-                activations.ln_out.data + s * n_embd,
-                block.c_fc_weight.data,
-                block.c_fc_bias.data,
-                activations.mlp_hidden.data + s * 4 * n_embd,
-                n_embd,
-                4 * n_embd
-            );
-        }
+        linear_forward(
+            activations.ln_out.data,
+            block.c_fc_weight.data,
+            block.c_fc_bias.data,
+            activations.mlp_hidden.data,
+            n_embd,
+            4 * n_embd,
+            seq_len
+        );
         
         // GELU activation: mlp_hidden = gelu(mlp_hidden)
         gelu_forward(
@@ -159,16 +156,15 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
         );
         
         // MLP Output Projection: mlp_hidden @ c_proj_mlp -> x
-        for (int s = 0; s < seq_len; ++s) {
-            linear_forward(
-                activations.mlp_hidden.data + s * 4 * n_embd,
-                block.c_proj_weight_mlp.data,
-                block.c_proj_bias_mlp.data,
-                activations.x.data + s * n_embd,
-                4 * n_embd,
-                n_embd
-            );
-        }
+        linear_forward(
+            activations.mlp_hidden.data,
+            block.c_proj_weight_mlp.data,
+            block.c_proj_bias_mlp.data,
+            activations.x.data,
+            4 * n_embd,
+            n_embd,
+            seq_len
+        );
         
         // Add residual: x += residual
         residual_add(
@@ -191,16 +187,15 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
     }
     
     // Vocabulary output projection (LM Head): ln_out @ lm_head^T -> logits
-    for (int s = 0; s < seq_len; ++s) {
-        linear_forward_transposed(
-            activations.ln_out.data + s * n_embd,
-            weights.lm_head.data,
-            nullptr,
-            activations.logits.data + s * config.vocab_size,
-            n_embd,
-            config.vocab_size
-        );
-    }
+    linear_forward_transposed(
+        activations.ln_out.data,
+        weights.lm_head.data,
+        nullptr,
+        activations.logits.data,
+        n_embd,
+        config.vocab_size,
+        seq_len
+    );
     
     return activations.logits.data;
 }

@@ -87,7 +87,7 @@ int main() {
     CUDA_CHECK(cudaMemcpy(fc_weight.data, host_fc_weight.data(), fc_weight.numel * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(fc_bias.data, host_fc_bias.data(), fc_bias.numel * sizeof(float), cudaMemcpyHostToDevice));
 
-    linear_forward(output.data, fc_weight.data, fc_bias.data, fc_output.data, 768, 3072);
+    linear_forward(output.data, fc_weight.data, fc_bias.data, fc_output.data, 768, 3072, 1);
 
     std::vector<float> verify_fc(3072);
     CUDA_CHECK(cudaMemcpy(verify_fc.data(), fc_output.data, 3072 * sizeof(float), cudaMemcpyDeviceToHost));
@@ -149,9 +149,7 @@ int main() {
     CUDA_CHECK(cudaMemcpy(attn_w.data, host_attn_w.data(), attn_w.numel * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(attn_b.data, host_attn_b.data(), attn_b.numel * sizeof(float), cudaMemcpyHostToDevice));
     // Batched linear projection to QKV
-    for (int s = 0; s < 3; ++s) {
-        linear_forward(seq_output.data + s * 768, attn_w.data, attn_b.data, attn_qkv.data + s * 2304, 768, 2304);
-    }
+    linear_forward(seq_output.data, attn_w.data, attn_b.data, attn_qkv.data, 768, 2304, 3);
     // Run Causal Self-Attention
     Tensor attn_out = create_gpu_tensor({3, 768});
     attention_forward(attn_qkv.data, attn_out.data, 3, 12, 64);
@@ -163,9 +161,7 @@ int main() {
     Tensor final_attn_out = create_gpu_tensor({3, 768});
     CUDA_CHECK(cudaMemcpy(proj_w.data, host_proj_w.data(), proj_w.numel * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(proj_b.data, host_proj_b.data(), proj_b.numel * sizeof(float), cudaMemcpyHostToDevice));
-    for (int s = 0; s < 3; ++s) {
-        linear_forward(attn_out.data + s * 768, proj_w.data, proj_b.data, final_attn_out.data + s * 768, 768, 768);
-    }
+    linear_forward(attn_out.data, proj_w.data, proj_b.data, final_attn_out.data, 768, 768, 3);
     // Verify first 5 values for token 0 and token 2
     std::vector<float> verify_attn(3 * 768);
     CUDA_CHECK(cudaMemcpy(verify_attn.data(), final_attn_out.data, 3 * 768 * sizeof(float), cudaMemcpyDeviceToHost));

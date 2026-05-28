@@ -6,7 +6,8 @@ void linear_forward(
     float* bias, 
     float* output, 
     int in_features, 
-    int out_features
+    int out_features,
+    int seq_len
 ); 
 
 void linear_forward_transposed(
@@ -15,5 +16,6 @@ void linear_forward_transposed(
     float* bias,
     float* output,
     int in_features,
-    int out_features
+    int out_features,
+    int seq_len
 );

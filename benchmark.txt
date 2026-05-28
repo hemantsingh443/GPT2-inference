@@ -1,5 +1,5 @@
 
-naive approch:
+baseline approach (cpu loops + sequential thread gemv):
 
 =========================================================================================
                          Model GEMM/GEMV Performance Benchmark                       
@@ -21,4 +21,35 @@ Attention QKV  1024      768            2304           No          122.333      
 Attention Proj 1024      768            768            No          122.109        9.89248        
 MLP Expansion  1024      768            3072           No          153.852        31.4058        
 Vocabulary Proj1024      768            50257          Yes         4235.52        18.663
+========================================================================================= 
+
+
+
+optimized approach (batched tiled gemm + warp-reduced gemv):
+
+=========================================================================================
+                         Model GEMM/GEMV Performance Benchmark
+=========================================================================================
+Layer          SeqLen    InFeatures     OutFeatures    Transposed  Latency (ms)   GFLOPS
+-----------------------------------------------------------------------------------------
+Attention QKV  1         768            2304           No          0.158659       22.3054        
+Attention Proj 1         768            768            No          0.0956006      12.3393        
+MLP Expansion  1         768            3072           No          0.208978       22.5794        
+Vocabulary Proj1         768            50257          Yes         0.922972       83.6371        
+Attention QKV  8         768            2304           No          0.255918       110.627        
+Attention Proj 8         768            768            No          0.132506       71.221
+MLP Expansion  8         768            3072           No          0.349532       107.998        
+Vocabulary Proj8         768            50257          Yes         6.81234        90.6528        
+Attention QKV  128       768            2304           No          1.15485        392.247        
+Attention Proj 128       768            768            No          0.471818       320.028        
+MLP Expansion  128       768            3072           No          1.61434        374.135        
+Vocabulary Proj128       768            50257          Yes         48.209         204.96
+Attention QKV  512       768            2304           No          4.33431        418.046        
+Attention Proj 512       768            768            No          1.57886        382.541        
+MLP Expansion  512       768            3072           No          5.83809        413.82
+Vocabulary Proj512       768            50257          Yes         193.228        204.544        
+Attention QKV  1024      768            2304           No          8.69779        416.643        
+Attention Proj 1024      768            768            No          3.09424        390.39
+MLP Expansion  1024      768            3072           No          11.7438        411.436        
+Vocabulary Proj1024      768            50257          Yes         388.738        203.344        
 =========================================================================================

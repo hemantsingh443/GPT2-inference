@@ -46,27 +46,25 @@ void run_benchmark(const BenchmarkConfig& config) {
     
     // Warmup execution
     if (config.transposed) {
-        for (int s = 0; s < config.seq_len; ++s) {
-            linear_forward_transposed(
-                d_input + s * config.in_features,
-                d_weights,
-                d_bias,
-                d_output + s * config.out_features,
-                config.in_features,
-                config.out_features
-            );
-        }
+        linear_forward_transposed(
+            d_input,
+            d_weights,
+            d_bias,
+            d_output,
+            config.in_features,
+            config.out_features,
+            config.seq_len
+        );
     } else {
-        for (int s = 0; s < config.seq_len; ++s) {
-            linear_forward(
-                d_input + s * config.in_features,
-                d_weights,
-                d_bias,
-                d_output + s * config.out_features,
-                config.in_features,
-                config.out_features
-            );
-        }
+        linear_forward(
+            d_input,
+            d_weights,
+            d_bias,
+            d_output,
+            config.in_features,
+            config.out_features,
+            config.seq_len
+        );
     }
     CUDA_CHECK(cudaDeviceSynchronize());
     
@@ -81,27 +79,25 @@ void run_benchmark(const BenchmarkConfig& config) {
     // Execute benchmark loop
     for (int run = 0; run < num_runs; ++run) {
         if (config.transposed) {
-            for (int s = 0; s < config.seq_len; ++s) {
-                linear_forward_transposed(
-                    d_input + s * config.in_features,
-                    d_weights,
-                    d_bias,
-                    d_output + s * config.out_features,
-                    config.in_features,
-                    config.out_features
-                );
-            }
+            linear_forward_transposed(
+                d_input,
+                d_weights,
+                d_bias,
+                d_output,
+                config.in_features,
+                config.out_features,
+                config.seq_len
+            );
         } else {
-            for (int s = 0; s < config.seq_len; ++s) {
-                linear_forward(
-                    d_input + s * config.in_features,
-                    d_weights,
-                    d_bias,
-                    d_output + s * config.out_features,
-                    config.in_features,
-                    config.out_features
-                );
-            }
+            linear_forward(
+                d_input,
+                d_weights,
+                d_bias,
+                d_output,
+                config.in_features,
+                config.out_features,
+                config.seq_len
+            );
         }
     }
     
