@@ -89,6 +89,13 @@ void GPT2Model::allocate_activations(int max_batch_size, int max_seq_len) {
     activations.attn_out = create_gpu_tensor({max_batch_size, max_seq_len, config.n_embd});
     activations.mlp_hidden = create_gpu_tensor({max_batch_size, max_seq_len, 4 * config.n_embd});
     activations.logits = create_gpu_tensor({max_batch_size, max_seq_len, config.vocab_size});
+
+    kv_caches.resize(config.n_layer);
+    for (int l = 0; l < config.n_layer; ++l) {
+        kv_caches[l].key_cache = create_gpu_tensor({max_batch_size, max_seq_len, config.n_embd});
+        kv_caches[l].value_cache = create_gpu_tensor({max_batch_size, max_seq_len, config.n_embd});
+    }
+    past_seq_len = 0;
 }
 
 void GPT2Model::free_weights() {
@@ -126,6 +133,13 @@ void GPT2Model::free_activations() {
     free_gpu_tensor(activations.attn_out);
     free_gpu_tensor(activations.mlp_hidden);
     free_gpu_tensor(activations.logits);
+
+    for (int l = 0; l < config.n_layer; ++l) {
+        free_gpu_tensor(kv_caches[l].key_cache);
+        free_gpu_tensor(kv_caches[l].value_cache);
+    }
+    kv_caches.clear();
+    past_seq_len = 0;
 }
 
 void GPT2Model::load_weights(const std::string& weights_dir) {

@@ -50,9 +50,19 @@ int main(int argc, char* argv[]) {
     std::vector<float> host_logits(cfg.vocab_size);
 
     for (int step = 0; step < max_new_tokens; ++step) {
-        float* d_logits = model.forward(tokens.data(), 1, tokens.size());
+        float* d_logits = nullptr;
+        if (step == 0) {
+            d_logits = model.forward(tokens.data(), 1, tokens.size());
+        } else {
+            d_logits = model.forward(&tokens.back(), 1, 1);
+        }
 
-        float* last_token_logits = d_logits + (tokens.size() - 1) * cfg.vocab_size;
+        float* last_token_logits = nullptr;
+        if (step == 0) {
+            last_token_logits = d_logits + (tokens.size() - 1) * cfg.vocab_size;
+        } else {
+            last_token_logits = d_logits;
+        }
 
         CUDA_CHECK(cudaMemcpy(
             host_logits.data(),

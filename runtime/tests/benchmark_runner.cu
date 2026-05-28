@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include "../include/cuda_utils.h"
 #include "../include/linear.h"
+#include "../include/attention.h"
 
 // Struct to store benchmark parameters
 struct BenchmarkConfig {
@@ -134,6 +135,71 @@ void run_benchmark(const BenchmarkConfig& config) {
     CUDA_CHECK(cudaFree(d_output));
 }
 
+void run_attention_benchmark(int seq_len, int past_seq_len) {
+    int num_runs = 50;
+    int num_heads = 12;
+    int head_dim = 64;
+    int n_embd = num_heads * head_dim;
+    int total_seq_len = past_seq_len + seq_len;
+
+    size_t qkv_size = seq_len * 3 * n_embd * sizeof(float);
+    size_t key_cache_size = total_seq_len * n_embd * sizeof(float);
+    size_t value_cache_size = total_seq_len * n_embd * sizeof(float);
+    size_t output_size = seq_len * n_embd * sizeof(float);
+
+    std::vector<float> h_qkv(seq_len * 3 * n_embd, 0.5f);
+    std::vector<float> h_key(total_seq_len * n_embd, 0.1f);
+    std::vector<float> h_val(total_seq_len * n_embd, 0.2f);
+
+    float* d_qkv = nullptr;
+    float* d_key = nullptr;
+    float* d_val = nullptr;
+    float* d_output = nullptr;
+
+    CUDA_CHECK(cudaMalloc(&d_qkv, qkv_size));
+    CUDA_CHECK(cudaMalloc(&d_key, key_cache_size));
+    CUDA_CHECK(cudaMalloc(&d_val, value_cache_size));
+    CUDA_CHECK(cudaMalloc(&d_output, output_size));
+
+    CUDA_CHECK(cudaMemcpy(d_qkv, h_qkv.data(), qkv_size, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_key, h_key.data(), key_cache_size, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_val, h_val.data(), value_cache_size, cudaMemcpyHostToDevice));
+
+    // Warmup execution
+    attention_forward(d_qkv, d_key, d_val, d_output, seq_len, past_seq_len, num_heads, head_dim);
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    cudaEvent_t start, stop;
+    CUDA_CHECK(cudaEventCreate(&start));
+    CUDA_CHECK(cudaEventCreate(&stop));
+
+    CUDA_CHECK(cudaEventRecord(start));
+    for (int run = 0; run < num_runs; ++run) {
+        attention_forward(d_qkv, d_key, d_val, d_output, seq_len, past_seq_len, num_heads, head_dim);
+    }
+    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+
+    float total_ms = 0.0f;
+    CUDA_CHECK(cudaEventElapsedTime(&total_ms, start, stop));
+    float avg_ms = total_ms / num_runs;
+
+    std::cout << std::left << std::setw(15) << "Attention"
+              << std::setw(10) << seq_len
+              << std::setw(15) << past_seq_len
+              << std::setw(15) << "-"
+              << std::setw(12) << "-"
+              << std::setw(15) << avg_ms
+              << std::setw(15) << "-" << "\n";
+
+    CUDA_CHECK(cudaEventDestroy(start));
+    CUDA_CHECK(cudaEventDestroy(stop));
+    CUDA_CHECK(cudaFree(d_qkv));
+    CUDA_CHECK(cudaFree(d_key));
+    CUDA_CHECK(cudaFree(d_val));
+    CUDA_CHECK(cudaFree(d_output));
+}
+
 int main() {
     std::cout << "=========================================================================================\n";
     std::cout << "                         Model GEMM/GEMV Performance Benchmark                            \n";
@@ -183,6 +249,11 @@ int main() {
     for (const auto& config : configs) {
         run_benchmark(config);
     }
+
+    std::cout << "-----------------------------------------------------------------------------------------\n";
+    
+    run_attention_benchmark(1024, 0);
+    run_attention_benchmark(1, 1023);
 
     std::cout << "=========================================================================================\n";
     return 0;

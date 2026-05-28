@@ -57,12 +57,20 @@ struct GPT2Activations {
 }; 
 
 
+struct KVCache {
+    Tensor key_cache;
+    Tensor value_cache;
+};
+
 //model class
 class GPT2Model {
 public:
     GPT2Config config;
     GPT2Weights weights;
     GPT2Activations activations;
+    std::vector<KVCache> kv_caches;
+    int past_seq_len;
+
     // Constructor/Destructor handles setting up GPU memory
     GPT2Model(const GPT2Config& cfg);
     ~GPT2Model();

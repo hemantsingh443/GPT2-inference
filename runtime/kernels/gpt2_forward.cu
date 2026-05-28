@@ -90,11 +90,23 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
             seq_len
         );
         
+        update_kv_cache(
+            activations.qkv.data,
+            kv_caches[l].key_cache.data,
+            kv_caches[l].value_cache.data,
+            n_embd,
+            seq_len,
+            past_seq_len
+        );
+
         // Self-Attention calculation: qkv -> attn_out
         attention_forward(
             activations.qkv.data,
+            kv_caches[l].key_cache.data,
+            kv_caches[l].value_cache.data,
             activations.attn_out.data,
             seq_len,
+            past_seq_len,
             config.n_head,
             n_embd / config.n_head
         );
@@ -197,5 +209,6 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
         seq_len
     );
     
+    past_seq_len += seq_len;
     return activations.logits.data;
 }

@@ -59,6 +59,7 @@ add_executable(
     src/tensor.cpp
 
     kernels/linear.cu
+    kernels/attention.cu
 )
 
 target_link_libraries(

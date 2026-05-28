@@ -151,8 +151,12 @@ int main() {
     // Batched linear projection to QKV
     linear_forward(seq_output.data, attn_w.data, attn_b.data, attn_qkv.data, 768, 2304, 3);
     // Run Causal Self-Attention
+    Tensor temp_key_cache = create_gpu_tensor({3, 768});
+    Tensor temp_value_cache = create_gpu_tensor({3, 768});
+    update_kv_cache(attn_qkv.data, temp_key_cache.data, temp_value_cache.data, 768, 3, 0);
+
     Tensor attn_out = create_gpu_tensor({3, 768});
-    attention_forward(attn_qkv.data, attn_out.data, 3, 12, 64);
+    attention_forward(attn_qkv.data, temp_key_cache.data, temp_value_cache.data, attn_out.data, 3, 0, 12, 64);
     // Project output using c_proj
     std::vector<float> host_proj_w = load_binary_file("../../weights/transformer_h_0_attn_c_proj_weight.bin");
     std::vector<float> host_proj_b = load_binary_file("../../weights/transformer_h_0_attn_c_proj_bias.bin");
@@ -262,6 +266,8 @@ int main() {
     cudaFree(ln_bias.data);
     cudaFree(ln_output.data); 
     cudaFree(seq_output.data); 
+    cudaFree(temp_key_cache.data);
+    cudaFree(temp_value_cache.data);
     cudaFree(attn_w.data); 
     cudaFree(attn_b.data); 
     cudaFree(attn_qkv.data); 
