@@ -156,7 +156,7 @@ int main() {
     update_kv_cache(attn_qkv.data, temp_key_cache.data, temp_value_cache.data, 768, 3, 0);
 
     Tensor attn_out = create_gpu_tensor({3, 768});
-    attention_forward(attn_qkv.data, temp_key_cache.data, temp_value_cache.data, attn_out.data, 3, 0, 12, 64);
+    attention_forward(attn_qkv.data, temp_key_cache.data, temp_value_cache.data, nullptr, nullptr, attn_out.data, 3, 0, 12, 64);
     // Project output using c_proj
     std::vector<float> host_proj_w = load_binary_file("../../weights/transformer_h_0_attn_c_proj_weight.bin");
     std::vector<float> host_proj_b = load_binary_file("../../weights/transformer_h_0_attn_c_proj_bias.bin");

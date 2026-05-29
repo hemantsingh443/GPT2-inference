@@ -96,6 +96,10 @@ void GPT2Model::allocate_activations(int max_batch_size, int max_seq_len) {
         kv_caches[l].value_cache = create_gpu_tensor({max_batch_size, max_seq_len, config.n_embd});
     }
     past_seq_len = 0;
+
+    int head_dim = config.n_embd / config.n_head;
+    activations.flash_decoding_temp_output = create_gpu_tensor({max_batch_size, config.n_head, 8, head_dim});
+    activations.flash_decoding_temp_stats = create_gpu_tensor({max_batch_size, config.n_head, 8, 2});
 }
 
 void GPT2Model::free_weights() {
@@ -140,6 +144,9 @@ void GPT2Model::free_activations() {
     }
     kv_caches.clear();
     past_seq_len = 0;
+
+    free_gpu_tensor(activations.flash_decoding_temp_output);
+    free_gpu_tensor(activations.flash_decoding_temp_stats);
 }
 
 void GPT2Model::load_weights(const std::string& weights_dir) {

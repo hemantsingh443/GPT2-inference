@@ -54,6 +54,8 @@ struct GPT2Activations {
     Tensor attn_out;        // Attention output: [batch_size, seq_len, n_embd]
     Tensor mlp_hidden;      // MLP intermediate state: [batch_size, seq_len, 4 * n_embd]
     Tensor logits;          // Output vocabulary distribution: [batch_size, seq_len, vocab_size]
+    Tensor flash_decoding_temp_output; // Temp output buffer for chunks
+    Tensor flash_decoding_temp_stats;  // Temp stats buffer for chunks
 }; 
 
 

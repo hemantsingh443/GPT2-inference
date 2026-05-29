@@ -104,6 +104,8 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
             activations.qkv.data,
             kv_caches[l].key_cache.data,
             kv_caches[l].value_cache.data,
+            activations.flash_decoding_temp_output.data,
+            activations.flash_decoding_temp_stats.data,
             activations.attn_out.data,
             seq_len,
             past_seq_len,

@@ -4,6 +4,8 @@ void attention_forward(
     float* qkv, 
     float* key_cache,
     float* value_cache,
+    float* temp_output,
+    float* temp_stats,
     float* output, 
     int seq_len, 
     int past_seq_len,

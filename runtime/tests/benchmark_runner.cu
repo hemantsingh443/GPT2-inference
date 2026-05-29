@@ -155,18 +155,22 @@ void run_attention_benchmark(int seq_len, int past_seq_len) {
     float* d_key = nullptr;
     float* d_val = nullptr;
     float* d_output = nullptr;
+    float* d_temp_output = nullptr;
+    float* d_temp_stats = nullptr;
 
     CUDA_CHECK(cudaMalloc(&d_qkv, qkv_size));
     CUDA_CHECK(cudaMalloc(&d_key, key_cache_size));
     CUDA_CHECK(cudaMalloc(&d_val, value_cache_size));
     CUDA_CHECK(cudaMalloc(&d_output, output_size));
+    CUDA_CHECK(cudaMalloc(&d_temp_output, num_heads * 8 * head_dim * sizeof(float)));
+    CUDA_CHECK(cudaMalloc(&d_temp_stats, num_heads * 8 * 2 * sizeof(float)));
 
     CUDA_CHECK(cudaMemcpy(d_qkv, h_qkv.data(), qkv_size, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_key, h_key.data(), key_cache_size, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_val, h_val.data(), value_cache_size, cudaMemcpyHostToDevice));
 
     // Warmup execution
-    attention_forward(d_qkv, d_key, d_val, d_output, seq_len, past_seq_len, num_heads, head_dim);
+    attention_forward(d_qkv, d_key, d_val, d_temp_output, d_temp_stats, d_output, seq_len, past_seq_len, num_heads, head_dim);
     CUDA_CHECK(cudaDeviceSynchronize());
 
     cudaEvent_t start, stop;
@@ -175,7 +179,7 @@ void run_attention_benchmark(int seq_len, int past_seq_len) {
 
     CUDA_CHECK(cudaEventRecord(start));
     for (int run = 0; run < num_runs; ++run) {
-        attention_forward(d_qkv, d_key, d_val, d_output, seq_len, past_seq_len, num_heads, head_dim);
+        attention_forward(d_qkv, d_key, d_val, d_temp_output, d_temp_stats, d_output, seq_len, past_seq_len, num_heads, head_dim);
     }
     CUDA_CHECK(cudaEventRecord(stop));
     CUDA_CHECK(cudaEventSynchronize(stop));
@@ -198,6 +202,8 @@ void run_attention_benchmark(int seq_len, int past_seq_len) {
     CUDA_CHECK(cudaFree(d_key));
     CUDA_CHECK(cudaFree(d_val));
     CUDA_CHECK(cudaFree(d_output));
+    CUDA_CHECK(cudaFree(d_temp_output));
+    CUDA_CHECK(cudaFree(d_temp_stats));
 }
 
 int main() {
