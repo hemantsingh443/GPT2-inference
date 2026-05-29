@@ -28,8 +28,9 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
     // Position embeddings lookup -> activations.residual
     std::vector<int> pos_ids(seq_len);
     for (int i = 0; i < seq_len; ++i) {
-        pos_ids[i] = i;
+        pos_ids[i] = past_seq_len + i;
     }
+
     int* d_pos_ids;
     CUDA_CHECK(cudaMalloc(&d_pos_ids, seq_len * sizeof(int)));
     CUDA_CHECK(cudaMemcpy(d_pos_ids, pos_ids.data(), seq_len * sizeof(int), cudaMemcpyHostToDevice));

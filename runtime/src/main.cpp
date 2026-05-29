@@ -3,6 +3,7 @@
 #include <string>
 #include <numeric>
 #include <algorithm>
+#include <random>
 
 #include "../include/tensor.h"  
 #include "../include/cuda_utils.h" 
@@ -45,6 +46,11 @@ int main(int argc, char* argv[]) {
     std::cout << "--- Generated Text ---\n";
     std::cout << prompt << std::flush;
 
+    // Initialize random number generator for sampling
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dis(0.0f, 1.0f);
+
     // Autoregressive Generation Loop
     int max_new_tokens = 30;
     std::vector<float> host_logits(cfg.vocab_size);
@@ -71,13 +77,55 @@ int main(int argc, char* argv[]) {
             cudaMemcpyDeviceToHost
         ));
 
-        // Greedy decoding: find the token with the highest probability (argmax)
-        int next_token_id = 0;
-        float max_val = -1e20f;
+        float temperature = 0.8f;
+        int K = 40;
+
+        if (temperature > 0.0f) {
+            for (int v = 0; v < cfg.vocab_size; ++v) {
+                host_logits[v] /= temperature;
+            }
+        }
+
+        struct TokenLogit {
+            int id;
+            float logit;
+        };
+        std::vector<TokenLogit> token_logits(cfg.vocab_size);
         for (int v = 0; v < cfg.vocab_size; ++v) {
-            if (host_logits[v] > max_val) {
-                max_val = host_logits[v];
-                next_token_id = v;
+            token_logits[v] = {v, host_logits[v]};
+        }
+
+        // Get the top K tokens
+        std::partial_sort(
+            token_logits.begin(),
+            token_logits.begin() + K,
+            token_logits.end(),
+            [](const TokenLogit& a, const TokenLogit& b) {
+                return a.logit > b.logit;
+            }
+        );
+
+        // Compute softmax over top K
+        float max_logit = token_logits[0].logit;
+        float sum_exp = 0.0f;
+        std::vector<float> probs(K);
+        for (int k = 0; k < K; ++k) {
+            probs[k] = expf(token_logits[k].logit - max_logit);
+            sum_exp += probs[k];
+        }
+        for (int k = 0; k < K; ++k) {
+            probs[k] /= sum_exp;
+        }
+
+        // Categorical sampling from the top K candidates
+        float r = dis(gen);
+        float cumulative_prob = 0.0f;
+        int next_token_id = token_logits[K - 1].id; // Fallback
+        for (int k = 0; k < K; ++k) {
+            cumulative_prob += probs[k];
+            if (r <= cumulative_prob) {
+                next_token_id = token_logits[k].id;
+                break;
             }
         }
 
@@ -93,6 +141,7 @@ int main(int argc, char* argv[]) {
         // Append the new token to the sequence for the next step
         tokens.push_back(next_token_id);
     }
+
 
     std::cout << "\nGeneration finished.\n";
 
