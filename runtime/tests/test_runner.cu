@@ -114,7 +114,7 @@ int main() {
     CUDA_CHECK(cudaMemcpy(ln_weight.data, host_ln_weight.data(), ln_weight.numel * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(ln_bias.data, host_ln_bias.data(), ln_bias.numel * sizeof(float), cudaMemcpyHostToDevice));
 
-    layernorm_forward(output.data, ln_weight.data, ln_bias.data, ln_output.data, 768, 1e-5f);
+    layernorm_forward(output.data, nullptr, ln_weight.data, ln_bias.data, ln_output.data, 768, 1, false, 1e-5f);
 
     std::vector<float> verify_ln(768);
     CUDA_CHECK(cudaMemcpy(verify_ln.data(), ln_output.data, 768 * sizeof(float), cudaMemcpyDeviceToHost));

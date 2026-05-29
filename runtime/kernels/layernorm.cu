@@ -5,18 +5,38 @@
 __global__ 
 void layernorm_kernel( 
     float* input, 
+    float* residual, 
     float* gamma, 
     float* beta, 
     float* output, 
     int hidden_size, 
+    bool add_residual,
     float eps
 ) { 
+    int token_idx = blockIdx.x; 
     int tid = threadIdx.x; 
 
-    //Compute mean
+    float* token_input = input + token_idx * hidden_size;
+    float* token_output = output + token_idx * hidden_size;
+    float* token_residual = (residual != nullptr) ? (residual + token_idx * hidden_size) : nullptr;
+
+    // Sum input and residual in-place if requested
+    if (token_residual != nullptr) {
+        for (int i = tid; i < hidden_size; i += blockDim.x) {
+            float val = token_input[i];
+            if (add_residual) {
+                val += token_residual[i];
+            }
+            token_input[i] = val;
+            token_residual[i] = val;
+        }
+        __syncthreads();
+    }
+
+    // Compute mean
     float local_sum = 0.0f; 
     for (int i = tid; i < hidden_size; i += blockDim.x) { 
-        local_sum += input[i]; 
+        local_sum += token_input[i]; 
     } 
 
     // Block-level reduction for sum using shared memory
@@ -37,10 +57,10 @@ void layernorm_kernel(
     } 
     __syncthreads(); 
 
-    //Compute variance
+    // Compute variance
     float local_sq_diff = 0.0f; 
     for (int i = tid; i < hidden_size; i += blockDim.x) { 
-        float diff = input[i] - mean; 
+        float diff = token_input[i] - mean; 
         local_sq_diff += diff * diff; 
     } 
 
@@ -61,24 +81,27 @@ void layernorm_kernel(
     } 
     __syncthreads(); 
 
-    //Normalize and scale/shift
+    // Normalize and scale/shift
     for (int i = tid; i < hidden_size; i += blockDim.x) { 
-        float norm = (input[i] - mean) * inv_std; 
-        output[i] = norm * gamma[i] + beta[i]; 
+        float norm = (token_input[i] - mean) * inv_std; 
+        token_output[i] = norm * gamma[i] + beta[i]; 
     } 
 } 
 
 void layernorm_forward( 
     float* input, 
+    float* residual, 
     float* gamma, 
     float* beta, 
     float* output, 
     int hidden_size, 
+    int seq_len,
+    bool add_residual,
     float eps
 ) { 
-    // Launch kernel with 1 block and 256 threads.
-    // 256 is a power of 2, ensuring correct block reduction.
+    // Launch kernel with block count equal to sequence length
     int threads_per_block = 256; 
-    layernorm_kernel<<<1, threads_per_block>>>(input, gamma, beta, output, hidden_size, eps); 
-    CUDA_CHECK(cudaDeviceSynchronize()); 
+    layernorm_kernel<<<seq_len, threads_per_block>>>(
+        input, residual, gamma, beta, output, hidden_size, add_residual, eps
+    ); 
 }

@@ -21,5 +21,4 @@ void residual_add(
     int threads_per_block = 256;
     int blocks = (size + threads_per_block - 1) / threads_per_block;
     residual_kernel<<<blocks, threads_per_block>>>(out, residual, size);
-    CUDA_CHECK(cudaDeviceSynchronize());
 }

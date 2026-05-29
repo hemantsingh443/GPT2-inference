@@ -57,9 +57,16 @@ add_executable(
 
     tests/benchmark_runner.cu
     src/tensor.cpp
+    src/gpt2.cpp
+    src/tokenizer.cpp
 
+    kernels/embedding.cu
     kernels/linear.cu
+    kernels/layernorm.cu 
     kernels/attention.cu
+    kernels/residual.cu 
+    kernels/gelu.cu
+    kernels/gpt2_forward.cu
 )
 
 target_link_libraries(

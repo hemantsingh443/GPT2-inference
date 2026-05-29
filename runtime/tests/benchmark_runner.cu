@@ -5,6 +5,7 @@
 #include "../include/cuda_utils.h"
 #include "../include/linear.h"
 #include "../include/attention.h"
+#include "../include/gpt2.h"
 
 // Struct to store benchmark parameters
 struct BenchmarkConfig {
@@ -206,6 +207,64 @@ void run_attention_benchmark(int seq_len, int past_seq_len) {
     CUDA_CHECK(cudaFree(d_temp_stats));
 }
 
+void run_model_forward_benchmark() {
+    std::cout << "\n=========================================================================================\n";
+    std::cout << "                         Full Model Forward Pass Benchmark                              \n";
+    std::cout << "=========================================================================================\n";
+    
+    GPT2Config cfg;
+    GPT2Model model(cfg);
+    model.load_weights("../../weights");
+    
+    std::vector<int> tokens(1024, 15496);
+    
+    // Warmup model execution
+    float* d_logits = model.forward(tokens.data(), 1, 1024);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    
+    int num_runs = 20;
+    cudaEvent_t start, stop;
+    CUDA_CHECK(cudaEventCreate(&start));
+    CUDA_CHECK(cudaEventCreate(&stop));
+    
+    // Measure prefill latency
+    CUDA_CHECK(cudaEventRecord(start));
+    for (int run = 0; run < num_runs; ++run) {
+        model.past_seq_len = 0;
+        model.forward(tokens.data(), 1, 1024);
+    }
+    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+    
+    float total_ms = 0.0f;
+    CUDA_CHECK(cudaEventElapsedTime(&total_ms, start, stop));
+    float prefill_avg_ms = total_ms / num_runs;
+    
+    // Warm up model cache to prepare for decoding
+    model.past_seq_len = 0;
+    model.forward(tokens.data(), 1, 1023);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    
+    // Measure generation/decoding step latency
+    CUDA_CHECK(cudaEventRecord(start));
+    for (int run = 0; run < num_runs * 10; ++run) {
+        model.forward(&tokens[0], 1, 1);
+        model.past_seq_len = 1023;
+    }
+    CUDA_CHECK(cudaEventRecord(stop));
+    CUDA_CHECK(cudaEventSynchronize(stop));
+    
+    CUDA_CHECK(cudaEventElapsedTime(&total_ms, start, stop));
+    float gen_avg_ms = total_ms / (num_runs * 10);
+    
+    std::cout << "Full Model Prefill (1024 tokens): " << prefill_avg_ms << " ms\n";
+    std::cout << "Full Model Decode Step (1024th token): " << gen_avg_ms << " ms\n";
+    std::cout << "=========================================================================================\n";
+    
+    CUDA_CHECK(cudaEventDestroy(start));
+    CUDA_CHECK(cudaEventDestroy(stop));
+}
+
 int main() {
     std::cout << "=========================================================================================\n";
     std::cout << "                         Model GEMM/GEMV Performance Benchmark                            \n";
@@ -262,5 +321,7 @@ int main() {
     run_attention_benchmark(1, 1023);
 
     std::cout << "=========================================================================================\n";
+    
+    run_model_forward_benchmark();
     return 0;
 }

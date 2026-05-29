@@ -58,26 +58,18 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
     for (int l = 0; l < config.n_layer; ++l) {
         BlockWeights& block = weights.blocks[l];
         
-        // Attention block
-        // Save residual input: x -> residual
-        CUDA_CHECK(cudaMemcpy(
-            activations.residual.data,
+        // Attention block LayerNorm (fused residual add and copy)
+        layernorm_forward(
             activations.x.data,
-            seq_len * n_embd * sizeof(float),
-            cudaMemcpyDeviceToDevice
-        ));
-        
-        // LayerNorm 1: x -> ln_out
-        for (int s = 0; s < seq_len; ++s) {
-            layernorm_forward(
-                activations.x.data + s * n_embd,
-                block.ln_1_weight.data,
-                block.ln_1_bias.data,
-                activations.ln_out.data + s * n_embd,
-                n_embd,
-                1e-5f
-            );
-        }
+            activations.residual.data,
+            block.ln_1_weight.data,
+            block.ln_1_bias.data,
+            activations.ln_out.data,
+            n_embd,
+            seq_len,
+            l > 0,
+            1e-5f
+        );
         
         // Projection to QKV: ln_out @ c_attn -> qkv
         linear_forward(
@@ -124,33 +116,18 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
             seq_len
         );
         
-        // Add residual: x += residual
-        residual_add(
+        // MLP block LayerNorm (fused residual add and copy)
+        layernorm_forward(
             activations.x.data,
             activations.residual.data,
-            seq_len * n_embd
+            block.ln_2_weight.data,
+            block.ln_2_bias.data,
+            activations.ln_out.data,
+            n_embd,
+            seq_len,
+            true,
+            1e-5f
         );
-        
-        // MLP block
-        // Save residual input: x -> residual
-        CUDA_CHECK(cudaMemcpy(
-            activations.residual.data,
-            activations.x.data,
-            seq_len * n_embd * sizeof(float),
-            cudaMemcpyDeviceToDevice
-        ));
-        
-        // LayerNorm 2: x -> ln_out
-        for (int s = 0; s < seq_len; ++s) {
-            layernorm_forward(
-                activations.x.data + s * n_embd,
-                block.ln_2_weight.data,
-                block.ln_2_bias.data,
-                activations.ln_out.data + s * n_embd,
-                n_embd,
-                1e-5f
-            );
-        }
         
         // MLP First Projection: ln_out @ c_fc -> mlp_hidden
         linear_forward(
@@ -179,26 +156,20 @@ float* GPT2Model::forward(const int* input_tokens, int batch_size, int seq_len) 
             n_embd,
             seq_len
         );
-        
-        // Add residual: x += residual
-        residual_add(
-            activations.x.data,
-            activations.residual.data,
-            seq_len * n_embd
-        );
     }
     
-    // Final layer normalization: x -> ln_out
-    for (int s = 0; s < seq_len; ++s) {
-        layernorm_forward(
-            activations.x.data + s * n_embd,
-            weights.ln_f_weight.data,
-            weights.ln_f_bias.data,
-            activations.ln_out.data + s * n_embd,
-            n_embd,
-            1e-5f
-        );
-    }
+    // Final layer normalization: x -> ln_out (fused with the final MLP residual addition)
+    layernorm_forward(
+        activations.x.data,
+        activations.residual.data,
+        weights.ln_f_weight.data,
+        weights.ln_f_bias.data,
+        activations.ln_out.data,
+        n_embd,
+        seq_len,
+        true,
+        1e-5f
+    );
     
     // Vocabulary output projection (LM Head): ln_out @ lm_head^T -> logits
     linear_forward_transposed(
