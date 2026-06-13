@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <iomanip>
+#include <fstream>
 #include <cuda_runtime.h>
 #include "../include/cuda_utils.h"
 #include "../include/linear.h"
@@ -212,9 +213,18 @@ void run_model_forward_benchmark() {
     std::cout << "                         Full Model Forward Pass Benchmark                              \n";
     std::cout << "=========================================================================================\n";
     
+    // Detect weights directory path automatically
+    std::string weights_dir = "../../weights";
+    {
+        std::ifstream test_file("weights/vocab.bin");
+        if (test_file.good()) {
+            weights_dir = "weights";
+        }
+    }
+
     GPT2Config cfg;
     GPT2Model model(cfg);
-    model.load_weights("../../weights");
+    model.load_weights(weights_dir);
     
     std::vector<int> tokens(1024, 15496);
     

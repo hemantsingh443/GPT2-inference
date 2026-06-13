@@ -4,6 +4,7 @@
 #include <numeric>
 #include <algorithm>
 #include <random>
+#include <fstream>
 
 #include "../include/tensor.h"  
 #include "../include/cuda_utils.h" 
@@ -24,14 +25,23 @@ int main(int argc, char* argv[]) {
 
     std::cout << "GPT-2 Autoregressive Text Generation\n";
 
-    std::cout << "Loading tokenizer (vocab.bin and merges.bin)..." << std::endl;
-    Tokenizer tokenizer;
-    tokenizer.load("../../weights/vocab.bin", "../../weights/merges.bin");
+    // Detect weights directory path automatically
+    std::string weights_dir = "../../weights";
+    {
+        std::ifstream test_file("weights/vocab.bin");
+        if (test_file.good()) {
+            weights_dir = "weights";
+        }
+    }
 
-    std::cout << "Loading GPT-2 model weights from weights/ directory..." << std::endl;
+    std::cout << "Loading tokenizer (vocab.bin and merges.bin) from " << weights_dir << "..." << std::endl;
+    Tokenizer tokenizer;
+    tokenizer.load(weights_dir + "/vocab.bin", weights_dir + "/merges.bin");
+
+    std::cout << "Loading GPT-2 model weights from " << weights_dir << " directory..." << std::endl;
     GPT2Config cfg;
     GPT2Model model(cfg);
-    model.load_weights("../../weights");
+    model.load_weights(weights_dir);
     std::cout << "Model loaded successfully!\n\n";
 
     // Encode the prompt

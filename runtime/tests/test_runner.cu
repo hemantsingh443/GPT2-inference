@@ -39,10 +39,19 @@ bool check_close(float val, float ref, float tol = 1e-4) {
 int main() {
     std::cout << "=== Running GPT-2 Inference Runtime Tests ===\n\n";
 
+    // Detect weights directory path automatically
+    std::string weights_dir = "../../weights";
+    {
+        std::ifstream test_file("weights/vocab.bin");
+        if (test_file.good()) {
+            weights_dir = "weights";
+        }
+    }
+
     //Load Token Embedding Table & Test Embedding Lookup
-    std::ifstream file("../../weights/transformer_wte_weight.bin", std::ios::binary);
+    std::ifstream file(weights_dir + "/transformer_wte_weight.bin", std::ios::binary);
     if (!file) {
-        std::cerr << "Error: weights/transformer_wte_weight.bin not found. Are you running from build/ directory?\n";
+        std::cerr << "Error: " << weights_dir << "/transformer_wte_weight.bin not found. Are you running from the correct directory?\n";
         return 1;
     }
     file.seekg(0, std::ios::end);
@@ -78,8 +87,8 @@ int main() {
     std::cout << "Test 1: Embedding Lookup -> " << (emb_passed ? "PASSED" : "FAILED") << "\n";
 
     //Test GEMM (linear_forward)
-    std::vector<float> host_fc_weight = load_binary_file("../../weights/transformer_h_0_mlp_c_fc_weight.bin");
-    std::vector<float> host_fc_bias = load_binary_file("../../weights/transformer_h_0_mlp_c_fc_bias.bin");
+    std::vector<float> host_fc_weight = load_binary_file(weights_dir + "/transformer_h_0_mlp_c_fc_weight.bin");
+    std::vector<float> host_fc_bias = load_binary_file(weights_dir + "/transformer_h_0_mlp_c_fc_bias.bin");
     Tensor fc_weight = create_gpu_tensor({768, 3072});
     Tensor fc_bias = create_gpu_tensor({3072});
     Tensor fc_output = create_gpu_tensor({3072});
@@ -105,8 +114,8 @@ int main() {
     std::cout << "Test 2: GEMM (Linear Forward) -> " << (fc_passed ? "PASSED" : "FAILED") << "\n";
 
     //Test LayerNorm
-    std::vector<float> host_ln_weight = load_binary_file("../../weights/transformer_h_0_ln_1_weight.bin");
-    std::vector<float> host_ln_bias = load_binary_file("../../weights/transformer_h_0_ln_1_bias.bin");
+    std::vector<float> host_ln_weight = load_binary_file(weights_dir + "/transformer_h_0_ln_1_weight.bin");
+    std::vector<float> host_ln_bias = load_binary_file(weights_dir + "/transformer_h_0_ln_1_bias.bin");
     Tensor ln_weight = create_gpu_tensor({768});
     Tensor ln_bias = create_gpu_tensor({768});
     Tensor ln_output = create_gpu_tensor({768});
@@ -141,8 +150,8 @@ int main() {
     Tensor seq_output = create_gpu_tensor({3, 768});
     embedding_lookup(wte.data, d_tokens, seq_output.data, 3, 768);
     // Load Attention QKV Projection Weights & Biases
-    std::vector<float> host_attn_w = load_binary_file("../../weights/transformer_h_0_attn_c_attn_weight.bin");
-    std::vector<float> host_attn_b = load_binary_file("../../weights/transformer_h_0_attn_c_attn_bias.bin");
+    std::vector<float> host_attn_w = load_binary_file(weights_dir + "/transformer_h_0_attn_c_attn_weight.bin");
+    std::vector<float> host_attn_b = load_binary_file(weights_dir + "/transformer_h_0_attn_c_attn_bias.bin");
     Tensor attn_w = create_gpu_tensor({768, 2304});
     Tensor attn_b = create_gpu_tensor({2304});
     Tensor attn_qkv = create_gpu_tensor({3, 2304});
@@ -158,8 +167,8 @@ int main() {
     Tensor attn_out = create_gpu_tensor({3, 768});
     attention_forward(attn_qkv.data, temp_key_cache.data, temp_value_cache.data, nullptr, nullptr, attn_out.data, 3, 0, 12, 64);
     // Project output using c_proj
-    std::vector<float> host_proj_w = load_binary_file("../../weights/transformer_h_0_attn_c_proj_weight.bin");
-    std::vector<float> host_proj_b = load_binary_file("../../weights/transformer_h_0_attn_c_proj_bias.bin");
+    std::vector<float> host_proj_w = load_binary_file(weights_dir + "/transformer_h_0_attn_c_proj_weight.bin");
+    std::vector<float> host_proj_b = load_binary_file(weights_dir + "/transformer_h_0_attn_c_proj_bias.bin");
     Tensor proj_w = create_gpu_tensor({768, 768});
     Tensor proj_b = create_gpu_tensor({768});
     Tensor final_attn_out = create_gpu_tensor({3, 768});
@@ -183,7 +192,7 @@ int main() {
     std::cout << "Loading full GPT-2 model weights...\n";
     GPT2Config cfg;
     GPT2Model model(cfg);
-    model.load_weights("../../weights");
+    model.load_weights(weights_dir);
     
     std::cout << "Running full model forward pass...\n";
     float* d_logits = model.forward(tokens.data(), 1, 3);
@@ -238,7 +247,7 @@ int main() {
     // 6. Test Tokenizer
     std::cout << "\nTesting Tokenizer...\n";
     Tokenizer tokenizer;
-    tokenizer.load("../../weights/vocab.bin", "../../weights/merges.bin");
+    tokenizer.load(weights_dir + "/vocab.bin", weights_dir + "/merges.bin");
     
     std::string test_str = "GPT2 inference runtime in C++ and CUDA";
     std::vector<int> encoded = tokenizer.encode(test_str);
